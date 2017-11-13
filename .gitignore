@@ -1,5 +1,8 @@
 .idea
 **/node_modules/*
 **/.firebaserc
+**/firebase.json
+**/package-lock.json
+**/functions/package-lock.json
 */npm-debug.log
 *~
