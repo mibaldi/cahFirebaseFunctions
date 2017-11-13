@@ -30,4 +30,29 @@ exports.initGame = functions.database.ref('/juegos/{idJuego}/jugadores').onWrite
     });
 });
 
+exports.changeTurnStatus = functions.database.ref('/juegos/{idJuego}/turnos/{idTurno}/estado').onWrite(event => {
+
+    const turnoRef = event.data.ref.parent;
+    const juegoRef = turnoRef.parent.parent;
+    const intervalo = 5;
+
+    let tiempoTurno = juegoRef.child('config').child('tiempo');
+
+     return tiempoTurno.once("value", (snapshot) => {
+        let tiempo = snapshot.val();
+
+        turnoRef.child('tiempo').set(tiempo)
+        let interval = setInterval(() => {
+            tiempo -= intervalo;
+            if (tiempo == 0) {
+                clearInterval(interval);
+            }
+            turnoRef.child('tiempo').set(tiempo)
+        }, intervalo*1000);
+
+        console.log("TIME'S UP")
+        //TODO
+    });
+});
+
 
