@@ -34,6 +34,7 @@ exports.changeTurnStatus = functions.database.ref('/juegos/{idJuego}/turnos/{idT
 
     const turnoRef = event.data.ref.parent;
     const juegoRef = turnoRef.parent.parent;
+    const estado = event.data.val()
     const intervalo = 5;
 
     let tiempoTurno = juegoRef.child('config').child('tiempo');
@@ -44,15 +45,39 @@ exports.changeTurnStatus = functions.database.ref('/juegos/{idJuego}/turnos/{idT
         turnoRef.child('tiempo').set(tiempo)
         let interval = setInterval(() => {
             tiempo -= intervalo;
-            if (tiempo == 0) {
-                clearInterval(interval);
-            }
             turnoRef.child('tiempo').set(tiempo)
+            if (tiempo <= 0) {
+                clearInterval(interval);
+                console.log("TIME'S UP!")
+                checkTimeout(estado,turnoRef)
+            }
+            
         }, intervalo*1000);
-
-        console.log("TIME'S UP")
         //TODO
     });
 });
+
+function checkTimeout(status,turnRef){
+    
+    switch(status){
+
+        case 0: 
+            //TODO
+            turnRef.child('estado').set(3)
+            break;
+        case 1:
+            //TODO
+            turnRef.child('estado').set(2)
+            break;
+        case 2:
+            //TODO
+            turnRef.child('estado').set(3)
+            break;
+        default:
+            //TODO
+            break;
+    }
+
+}
 
 
