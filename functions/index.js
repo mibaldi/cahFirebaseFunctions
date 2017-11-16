@@ -33,51 +33,61 @@ exports.initGame = functions.database.ref('/juegos/{idJuego}/jugadores').onWrite
 
 exports.changeTurnStatus = functions.database.ref('/juegos/{idJuego}/turnos/{idTurno}/estado').onWrite(event => {
 
-    const turnoRef = event.data.ref.parent;
-    const juegoRef = turnoRef.parent.parent;
-    const estado = event.data.val()
-    const intervalo = 5;
-    const tiempoTurno = juegoRef.child('config').child('tiempo');
+    const turnRef = event.data.ref.parent;
+    const gameRef = turnRef.parent.parent;
+    const status = event.data.val()
+    const turnTimeRef = gameRef.child('config').child('tiempo');
 
-     return tiempoTurno.once("value", (snapshot) => {
-        let tiempo = snapshot.val();
+    const interval = 5;
 
-        turnoRef.child('tiempo').set(tiempo)
-        let interval = setInterval(() => {
-            tiempo -= intervalo;
-            turnoRef.child('tiempo').set(tiempo)
-            if (tiempo <= 0) {
-                clearInterval(interval);
-                checkTimeout(estado,turnoRef)
+    return turnTimeRef.once("value", (snapshot) => {
+    	
+        let count = snapshot.val();
+
+        turnRef.child('tiempo').set(count)
+
+        let timer = setInterval(() => {
+            count -= interval;
+
+            turnRef.child('tiempo').set(count)
+
+            if (count <= 0) {
+                clearInterval(timer);
+                checkTimeout(status,turnRef)
             }
-            
-        }, intervalo*1000);
+
+        }, interval*1000);
     });
 });
 
 function checkTimeout(status,turnRef){
-    
+
     switch(status){
 
         case 0: 
             checkQuestion(turnRef)
             break;
+
         case 1:
             checkAnswers(turnRef)
             break;
+
         case 2:
             checkWinner(turnRef)
             break;
+
         default:
             //TODO
             break;
     }
+
 }
 
 function checkQuestion(turnRef){
 	return turnRef.child('pregunta').once("value", (snapshot) => {
         let question = snapshot.val();
         let nextStatus = (question != null) ? 1 : 3
+
         turnRef.child('estado').set(nextStatus)
     });
 }
@@ -86,6 +96,7 @@ function checkAnswers(turnRef){
 	return turnRef.child('posibles').once("value", (snapshot) => {
         let posibles = snapshot.val();
         let nextStatus = (posibles != null) ? 2 : 3
+
         turnRef.child('estado').set(nextStatus)
     });
 }
@@ -104,6 +115,7 @@ function checkWinner(turnRef){
         	const players = Object.keys(possibles);
         	winner = players[ players.length * Math.random() << 0];
         }
+
         turnRef.update({ganador : winner,estado : 3})
     });
 }
