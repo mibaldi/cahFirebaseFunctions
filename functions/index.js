@@ -1,8 +1,9 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
-
 admin.initializeApp(functions.config().firebase);
+const database = admin.database();
+
 
 exports.initGame = functions.database.ref('/juegos/{idJuego}/jugadores').onWrite(event => {
 	
@@ -36,8 +37,7 @@ exports.changeTurnStatus = functions.database.ref('/juegos/{idJuego}/turnos/{idT
     const juegoRef = turnoRef.parent.parent;
     const estado = event.data.val()
     const intervalo = 5;
-
-    let tiempoTurno = juegoRef.child('config').child('tiempo');
+    const tiempoTurno = juegoRef.child('config').child('tiempo');
 
      return tiempoTurno.once("value", (snapshot) => {
         let tiempo = snapshot.val();
@@ -48,12 +48,10 @@ exports.changeTurnStatus = functions.database.ref('/juegos/{idJuego}/turnos/{idT
             turnoRef.child('tiempo').set(tiempo)
             if (tiempo <= 0) {
                 clearInterval(interval);
-                console.log("TIME'S UP!")
                 checkTimeout(estado,turnoRef)
             }
             
         }, intervalo*1000);
-        //TODO
     });
 });
 
@@ -62,22 +60,54 @@ function checkTimeout(status,turnRef){
     switch(status){
 
         case 0: 
-            //TODO
-            turnRef.child('estado').set(3)
+            checkQuestion(turnRef)
             break;
         case 1:
-            //TODO
-            turnRef.child('estado').set(2)
+            checkAnswers(turnRef)
             break;
         case 2:
-            //TODO
-            turnRef.child('estado').set(3)
+            checkWinner(turnRef)
             break;
         default:
             //TODO
             break;
     }
-
 }
+
+function checkQuestion(turnRef){
+	return turnRef.child('pregunta').once("value", (snapshot) => {
+        let question = snapshot.val();
+        let nextStatus = (question != null) ? 1 : 3
+        turnRef.child('estado').set(nextStatus)
+    });
+}
+
+function checkAnswers(turnRef){
+	return turnRef.child('posibles').once("value", (snapshot) => {
+        let posibles = snapshot.val();
+        let nextStatus = (posibles != null) ? 2 : 3
+        turnRef.child('estado').set(nextStatus)
+    });
+}
+
+function checkWinner(turnRef){
+
+	const getWinner = turnRef.child('ganador').once('value');
+  	const getPossibles = turnRef.child('posibles').once('value');
+
+	return Promise.all([getWinner, getPossibles]).then(results => {
+
+        let winner = results[0].val();
+        const possibles = results[1].val();
+
+        if(winner == null && possibles != null){
+        	const players = Object.keys(possibles);
+        	winner = players[ players.length * Math.random() << 0];
+        }
+        turnRef.update({ganador : winner,estado : 3})
+    });
+}
+
+
 
 
