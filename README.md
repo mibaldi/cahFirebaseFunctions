@@ -28,13 +28,11 @@ Ejemplo estado de turno:
 
 El flujo de estados es el siguiente:
 
-- E0 -> E1 si el jugador ha seleccionado una pregunta
-     -> E3 si no se ha seleccionado ninguna pregunta
+- E0 -> E1 (si el jugador ha seleccionado una pregunta) ó E3 (si no se ha seleccionado ninguna pregunta)
 
-- E1 -> E2 si al menos un jugador ha elegido respuesta
-	 -> E3 si ningún jugador ha elejido respuesta
+- E1 -> E2 (si al menos un jugador ha elegido respuesta) ó E3 (si ningún jugador ha elejido respuesta)
 
-- E2 -> E3 Si el jugador ha seleccionado una respuesta ganadora. Si el jugador no ha seleccionado una respuesta ganadora se elegirá una respuesta aleatoria como ganadora.
+- E2 -> E3 (si el jugador ha seleccionado una respuesta ganadora). Si el jugador no ha seleccionado una respuesta ganadora se elegirá una respuesta aleatoria como ganadora.
 
 
 
