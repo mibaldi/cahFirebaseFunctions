@@ -5,7 +5,7 @@
 
 # Cambios de estados
 
-Los turnos son de 3 estados:
+Los turnos son de 4 estados:
 
 - Estado 0: El narrador tiene n segundos para escoger una pregunta.
 - Estado 1: El resto de jugadores tienen n segundos para escojer una respuesta a la pregunta del narrador.
