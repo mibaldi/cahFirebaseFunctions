@@ -5,8 +5,28 @@ admin.initializeApp(functions.config().firebase);
 const database = admin.database();
 const _ = require('lodash');
 
+exports.createGame = functions.database.ref('/juegos/{idJuego}').onCreate(event => {
+    return database.ref('/cartas').once('value', (snapshot) => {
+        const numWhiteCards = snapshot.child('blancas').numChildren()
+        const numBlackCards = snapshot.child('negras').numChildren()
 
-exports.changeNumPlayers = functions.database.ref('/juegos/{idJuego}/jugadores').onUpdate(event => {
+        const game = event.data.val()
+
+        const config = game.config;
+
+        const numBlacks = config.rondas * config.numJugadores
+        const numWhites = numBlacks * config.numCartasJugador;
+
+        const blackCards = getRandomArray(numBlackCards,numBlacks)
+        const whiteCards = getRandomArray(numWhiteCards,numWhites)
+
+        const cards = { negras : blackCards, blancas : whiteCards  }
+
+        event.data.ref.child('cartas').set(cards)
+    });
+});
+
+exports.changeNumPlayers = functions.database.ref('/juegos/{idJuego}/jugadores').onWrite(event => {
 	
   const juegoRef = event.data.ref.parent;
   const numJugadores = juegoRef.child('config').child('numJugadores');
@@ -14,20 +34,19 @@ exports.changeNumPlayers = functions.database.ref('/juegos/{idJuego}/jugadores')
   const juegoStateRef = juegoRef.child('estado');
   let number = 1;
   numJugadores.once("value", function(data) {
-     number = data.val()
- });
+   number = data.val()
+    });
 
   return jugadoresRef.once("value", (snapshot) => {
-      console.log(snapshot.numChildren())
 
-      if (snapshot.numChildren() === number ) {
-         juegoRef.update({estado : 1});
-         console.log("Empieza la partida");
-     }else {
-         juegoRef.update({estado : 0});
-         console.log('Faltan jugadores');
-     }
- });
+    if (snapshot.numChildren() === number ) {
+       juegoRef.update({estado : 1});
+       console.log("Empieza la partida");
+    }else {
+       juegoRef.update({estado : 0});
+       console.log('Faltan jugadores');
+   }
+});
 });
 
 exports.changeGameStatus = functions.database.ref('/juegos/{idJuego}/estado').onUpdate(event => {
@@ -36,23 +55,8 @@ exports.changeGameStatus = functions.database.ref('/juegos/{idJuego}/estado').on
     if(status === 1){
         initGame(gameRef)
     }
-       
     return status;
 });
-
-function initGame(gameRef){
-    gameRef.once("value", (snapshot) => {
-        const game = snapshot.val()
-        const playersOrder = getPlayersOrder(game.jugadores)
-        const firstTurn = {0 : {narrador : playersOrder[0]}}
-        //TODO Preparar las cartas
-        gameRef.update({orden : playersOrder, turnos : firstTurn})
-    });
-}
-
-function finishGame(gameRef){
-    gameRef.update({estado : 2});
-}
 
 exports.changeTurnStatus = functions.database.ref('/juegos/{idJuego}/turnos/{idTurno}/estado').onWrite(event => {
 
@@ -70,9 +74,41 @@ exports.changeTurnStatus = functions.database.ref('/juegos/{idJuego}/turnos/{idT
     });
 });
 
+function getRandomArray(maxSize,minSize){
+    let randomList = [];
+
+    while(randomList.length < minSize){
+        const random = _.random(maxSize)
+        if(!randomList.includes(random)){
+            randomList.push(random)
+        }
+    }
+    return randomList;
+}
+
+function initGame(gameRef){
+
+    const getCards = database.ref('/cartas').once('value');
+    const getGame = gameRef.once("value");
+    return gameRef.once("value", (snapshot) => {
+
+        const game = snapshot.val()
+
+        const playersOrder = getPlayersOrder(game.jugadores)
+        const firstTurn = {0 : {narrador : playersOrder[0]}}
+
+        gameRef.update({orden : playersOrder, turnos : firstTurn})
+
+    });
+}
+
+function finishGame(gameRef){
+    gameRef.update({estado : 2});
+}
+
+
 function getPlayersOrder(playersDict){
-    const players = _.shuffle(_.keys(playersDict)) 
-    return _.zipObject(_.range(players.length),players)
+    return _.shuffle(_.keys(playersDict)) 
 }
 
 function getPlayerIndex(orderDict,player){
@@ -114,9 +150,8 @@ function checkQuestion(turnRef){
 function checkAnswers(turnRef){
 	return turnRef.child('posibles').once("value", (snapshot) => {
         let possibles = snapshot.val();
-        if(possibles == null){
-            turnRef.child('estado').set(3)
-        } 
+        const status = (possibles != null) 2 : 3;
+        turnRef.child('estado').set(status)
     });
 }
 
@@ -140,24 +175,23 @@ function checkWinner(turnRef){
 function createTurn(gameRef){
     return gameRef.once("value", (snapshot) => {
         const game = snapshot.val()
-        let numUsedCards = game.usadas;
         const numCards = _.keys(game.cartas.negras).length;
 
-            const turns = game.turnos;
-            const order = game.orden;
-            const lastTurn = turns[_.keys(turns)[_.keys(turns).length - 1]]
-            const lastIndex = getPlayerIndex(order,lastTurn.narrador)
+        const turns = game.turnos;
+        const order = game.orden;
+        const lastTurn = turns[_.keys(turns)[_.keys(turns).length - 1]]
+        const lastIndex = getPlayerIndex(order,lastTurn.narrador)
 
-            if(turns.length === numCards - 1){
-               finishGame(gameRef)
-            }else{
-                let newIndex = parseInt(lastIndex) + 1;
+        if(turns.length === numCards){
+            finishGame(gameRef)
+        }else{
+            let newIndex = parseInt(lastIndex) + 1;
             const newTurn = { narrador : order[newIndex]}
 
             let obj = {}
             obj["turnos/"+newIndex] = newTurn;
             gameRef.update(obj)
-            }
+        }
 
     });
 }
