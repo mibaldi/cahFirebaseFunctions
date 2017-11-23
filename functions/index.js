@@ -3,82 +3,101 @@ const admin = require('firebase-admin');
 
 admin.initializeApp(functions.config().firebase);
 const database = admin.database();
+const _ = require('lodash');
 
 
-exports.initGame = functions.database.ref('/juegos/{idJuego}/jugadores').onWrite(event => {
+exports.changeNumPlayers = functions.database.ref('/juegos/{idJuego}/jugadores').onUpdate(event => {
 	
- 	const juegoRef = event.data.ref.parent;
- 	const numJugadores = juegoRef.child('config').child('numJugadores');
- 	const jugadoresRef = event.data.ref;
- 	const juegoStateRef = juegoRef.child('estado');
- 	let number = 1;
- 	numJugadores.once("value", function(data) {
- 		number = data.val()
-	});
-	
-    return jugadoresRef.once("value", (snapshot) => {
-     	console.log(snapshot.numChildren())
+  const juegoRef = event.data.ref.parent;
+  const numJugadores = juegoRef.child('config').child('numJugadores');
+  const jugadoresRef = event.data.ref;
+  const juegoStateRef = juegoRef.child('estado');
+  let number = 1;
+  numJugadores.once("value", function(data) {
+     number = data.val()
+ });
 
-     	if (snapshot.numChildren() === number ) {
-     		juegoRef.update({
-     			"estado":"1"});
-     		console.log("Empieza la partida");
-     	}else {
-     		juegoRef.update({
-     			"estado":"0"});
-     		console.log('Faltan jugadores');
-     	}
-    });
+  return jugadoresRef.once("value", (snapshot) => {
+      console.log(snapshot.numChildren())
+
+      if (snapshot.numChildren() === number ) {
+         juegoRef.update({estado : 1});
+         console.log("Empieza la partida");
+     }else {
+         juegoRef.update({estado : 0});
+         console.log('Faltan jugadores');
+     }
+ });
 });
+
+exports.changeGameStatus = functions.database.ref('/juegos/{idJuego}/estado').onUpdate(event => {
+    const status = event.data.val()
+    const gameRef = event.data.ref.parent;
+    if(status === 1){
+        initGame(gameRef)
+    }
+       
+    return status;
+});
+
+function initGame(gameRef){
+    gameRef.once("value", (snapshot) => {
+        const game = snapshot.val()
+        const playersOrder = getPlayersOrder(game.jugadores)
+        const firstTurn = {0 : {narrador : playersOrder[0]}}
+        //TODO Preparar las cartas
+        gameRef.update({orden : playersOrder, turnos : firstTurn})
+    });
+}
+
+function finishGame(gameRef){
+    gameRef.update({estado : 2});
+}
 
 exports.changeTurnStatus = functions.database.ref('/juegos/{idJuego}/turnos/{idTurno}/estado').onWrite(event => {
 
     const turnRef = event.data.ref.parent;
     const gameRef = turnRef.parent.parent;
     const status = event.data.val()
-    const turnTimeRef = gameRef.child('config').child('tiempo');
 
-    const interval = 5;
+    return gameRef.once("value", (snapshot) => {
 
-    return turnTimeRef.once("value", (snapshot) => {
-    	
-        let count = snapshot.val();
+        const game = snapshot.val()
 
-        turnRef.child('tiempo').set(count)
-
-        let timer = setInterval(() => {
-            count -= interval;
-
-            turnRef.child('tiempo').set(count)
-
-            if (count <= 0) {
-                clearInterval(timer);
-                checkTimeout(status,turnRef)
-            }
-
-        }, interval*1000);
+        setTimeout(() => {
+            checkTimeout(status,turnRef,gameRef)
+        }, game.config.tiempo*1000);
     });
 });
 
-function checkTimeout(status,turnRef){
+function getPlayersOrder(playersDict){
+    const players = _.shuffle(_.keys(playersDict)) 
+    return _.zipObject(_.range(players.length),players)
+}
+
+function getPlayerIndex(orderDict,player){
+    return _.findKey(orderDict, (value) => { return value === player});
+}
+
+function checkTimeout(status,turnRef,gameRef){
 
     switch(status){
 
         case 0: 
-            checkQuestion(turnRef)
-            break;
+        checkQuestion(turnRef)
+        break;
 
         case 1:
-            checkAnswers(turnRef)
-            break;
+        checkAnswers(turnRef)
+        break;
 
         case 2:
-            checkWinner(turnRef)
-            break;
+        checkWinner(turnRef)
+        break;
 
-        default:
-            //TODO
-            break;
+        case 3:
+        createTurn(gameRef)
+        break;
     }
 
 }
@@ -86,37 +105,60 @@ function checkTimeout(status,turnRef){
 function checkQuestion(turnRef){
 	return turnRef.child('pregunta').once("value", (snapshot) => {
         let question = snapshot.val();
-        let nextStatus = (question != null) ? 1 : 3
-
-        turnRef.child('estado').set(nextStatus)
+        if(question == null){
+            turnRef.child('estado').set(3)
+        } 
     });
 }
 
 function checkAnswers(turnRef){
 	return turnRef.child('posibles').once("value", (snapshot) => {
-        let posibles = snapshot.val();
-        let nextStatus = (posibles != null) ? 2 : 3
-
-        turnRef.child('estado').set(nextStatus)
+        let possibles = snapshot.val();
+        if(possibles == null){
+            turnRef.child('estado').set(3)
+        } 
     });
 }
 
 function checkWinner(turnRef){
 
-	const getWinner = turnRef.child('ganador').once('value');
-  	const getPossibles = turnRef.child('posibles').once('value');
+    return turnRef.once("value", (snapshot) => {
 
-	return Promise.all([getWinner, getPossibles]).then(results => {
+        const turn = snapshot.val()
 
-        let winner = results[0].val();
-        const possibles = results[1].val();
+        let winner = turn.ganador;
+        const possibles = turn.posibles;
 
         if(winner == null && possibles != null){
         	const players = Object.keys(possibles);
         	winner = players[ players.length * Math.random() << 0];
         }
-
         turnRef.update({ganador : winner,estado : 3})
+    });
+}
+
+function createTurn(gameRef){
+    return gameRef.once("value", (snapshot) => {
+        const game = snapshot.val()
+        let numUsedCards = game.usadas;
+        const numCards = _.keys(game.cartas.negras).length;
+
+            const turns = game.turnos;
+            const order = game.orden;
+            const lastTurn = turns[_.keys(turns)[_.keys(turns).length - 1]]
+            const lastIndex = getPlayerIndex(order,lastTurn.narrador)
+
+            if(turns.length === numCards - 1){
+               finishGame(gameRef)
+            }else{
+                let newIndex = parseInt(lastIndex) + 1;
+            const newTurn = { narrador : order[newIndex]}
+
+            let obj = {}
+            obj["turnos/"+newIndex] = newTurn;
+            gameRef.update(obj)
+            }
+
     });
 }
 
