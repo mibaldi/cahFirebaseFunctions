@@ -6,6 +6,11 @@ const database = admin.database();
 const _ = require('lodash');
 
 exports.createGame = functions.database.ref('/juegos/{idJuego}').onCreate(event => {
+    
+    if (!event.data.exists()) {
+        return;
+    }
+
     return database.ref('/cartas').once('value', (snapshot) => {
         const numWhiteCards = snapshot.child('blancas').numChildren()
         const numBlackCards = snapshot.child('negras').numChildren()
@@ -28,6 +33,10 @@ exports.createGame = functions.database.ref('/juegos/{idJuego}').onCreate(event 
 
 exports.changeNumPlayers = functions.database.ref('/juegos/{idJuego}/jugadores').onWrite(event => {
 	
+  if (!event.data.exists()) {
+    return;
+  }
+    
   const juegoRef = event.data.ref.parent;
   const numJugadores = juegoRef.child('config').child('numJugadores');
   const jugadoresRef = event.data.ref;
@@ -49,7 +58,7 @@ exports.changeNumPlayers = functions.database.ref('/juegos/{idJuego}/jugadores')
 });
 });
 
-exports.changeGameStatus = functions.database.ref('/juegos/{idJuego}/estado').onUpdate(event => {
+exports.changeGameStatus = functions.database.ref('/juegos/{idJuego}/estado').onWrite(event => {
     const status = event.data.val()
     const gameRef = event.data.ref.parent;
     if(status === 1){
@@ -88,16 +97,16 @@ function getRandomArray(maxSize,minSize){
 
 function initGame(gameRef){
 
-    const getCards = database.ref('/cartas').once('value');
-    const getGame = gameRef.once("value");
     return gameRef.once("value", (snapshot) => {
 
         const game = snapshot.val()
 
-        const playersOrder = getPlayersOrder(game.jugadores)
+        const players = handOut(game,game.config.numCartasJugador)
+
+        const playersOrder = getPlayersOrder(players)
         const firstTurn = {0 : {narrador : playersOrder[0]}}
 
-        gameRef.update({orden : playersOrder, turnos : firstTurn})
+        gameRef.update({orden : playersOrder, turnos : firstTurn, jugadores : players})
 
     });
 }
@@ -150,7 +159,7 @@ function checkQuestion(turnRef){
 function checkAnswers(turnRef){
 	return turnRef.child('posibles').once("value", (snapshot) => {
         let possibles = snapshot.val();
-        const status = (possibles != null) 2 : 3;
+        const status = (possibles != null)? 2 : 3;
         turnRef.child('estado').set(status)
     });
 }
@@ -170,6 +179,24 @@ function checkWinner(turnRef){
         }
         turnRef.update({ganador : winner,estado : 3})
     });
+}
+
+function handOut(game,numCards){
+
+    const numPlayers = game.config.numJugadores;
+    const numCardsToDistribute = numPlayers * numCards;
+
+    let players = game.jugadores
+
+    let cards = _.values(game.cartas.blancas);
+
+    const cardsDistributed = _.chunk(cards.slice(0,numCardsToDistribute),numPlayers)
+
+    const playerKeys =  _.keys(players);
+    for (i = 0; i < playerKeys.length; i++) { 
+        players[playerKeys[i]].cartas = _.assign(players[playerKeys[i]].cartas,cardsDistributed[i]) 
+    }
+    return players;
 }
 
 function createTurn(gameRef){
