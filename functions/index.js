@@ -101,12 +101,20 @@ function initGame(gameRef){
 
         const game = snapshot.val()
 
-        const players = handOut(game,game.config.numCartasJugador)
+        const result = handOut(game,game.config.numCartasJugador)
 
-        const playersOrder = getPlayersOrder(players)
+        console.log(result)
+
+        const playersOrder = getPlayersOrder(result[0])
         const firstTurn = {0 : {narrador : playersOrder[0]}}
 
-        gameRef.update({orden : playersOrder, turnos : firstTurn, jugadores : players})
+        let obj = {}
+        obj['orden'] = playersOrder;
+        obj['turnos'] = firstTurn;
+        obj['jugadores'] = result[0];
+        obj['cartas'] = { blancas : result[1]};
+
+        gameRef.update(obj)
 
     });
 }
@@ -185,18 +193,28 @@ function handOut(game,numCards){
 
     const numPlayers = game.config.numJugadores;
     const numCardsToDistribute = numPlayers * numCards;
+    let whiteCards = game.cartas.blancas
 
     let players = game.jugadores
 
-    let cards = _.values(game.cartas.blancas);
+    let cards = _.values(whiteCards);
 
     const cardsDistributed = _.chunk(cards.slice(0,numCardsToDistribute),numPlayers)
 
     const playerKeys =  _.keys(players);
     for (i = 0; i < playerKeys.length; i++) { 
-        players[playerKeys[i]].cartas = _.assign(players[playerKeys[i]].cartas,cardsDistributed[i]) 
+        let handouts;
+        if(players[playerKeys[i]].cartas != ""){
+            handouts = _.assign(players[playerKeys[i]].cartas,cardsDistributed[i]);
+        }else{
+            handouts = cardsDistributed[i];
+        }
+        players[playerKeys[i]].cartas = handouts;
     }
-    return players;
+
+    let index = _.keys(whiteCards).slice(0,numCardsToDistribute);
+
+    return [players,_.omit(whiteCards,index)];
 }
 
 function createTurn(gameRef){
@@ -222,6 +240,7 @@ function createTurn(gameRef){
 
     });
 }
+
 
 
 
