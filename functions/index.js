@@ -27,7 +27,11 @@ exports.createGame = functions.database.ref('/juegos/{idJuego}').onCreate(event 
 
         const cards = { negras : blackCards, blancas : whiteCards  }
 
-        event.data.ref.child('cartas').set(cards)
+        let obj = {}
+        obj['cartas'] = cards;
+        obj['estado'] = 1; 
+        console.log("Cartas generadas");
+        event.data.ref.update(obj)
     });
 });
 
@@ -49,10 +53,10 @@ exports.changeNumPlayers = functions.database.ref('/juegos/{idJuego}/jugadores')
   return jugadoresRef.once("value", (snapshot) => {
 
     if (snapshot.numChildren() === number ) {
-       juegoRef.update({estado : 1});
+       juegoRef.update({estado : 3});
        console.log("Empieza la partida");
     }else {
-       juegoRef.update({estado : 0});
+       juegoRef.update({estado : 2});
        console.log('Faltan jugadores');
    }
 });
@@ -61,7 +65,7 @@ exports.changeNumPlayers = functions.database.ref('/juegos/{idJuego}/jugadores')
 exports.changeGameStatus = functions.database.ref('/juegos/{idJuego}/estado').onWrite(event => {
     const status = event.data.val()
     const gameRef = event.data.ref.parent;
-    if(status === 1){
+    if(status === 3){
         initGame(gameRef)
     }
     return status;
@@ -120,7 +124,7 @@ function initGame(gameRef){
 }
 
 function finishGame(gameRef){
-    gameRef.update({estado : 2});
+    gameRef.update({estado : 4});
 }
 
 
@@ -199,16 +203,17 @@ function handOut(game,numCards){
 
     let cards = _.values(whiteCards);
 
-    const cardsDistributed = _.chunk(cards.slice(0,numCardsToDistribute),numPlayers)
+    const cardsDistributed = _.chunk(cards.slice(0,numCardsToDistribute),numCards)
 
     const playerKeys =  _.keys(players);
     for (i = 0; i < playerKeys.length; i++) { 
         let handouts;
-        if(players[playerKeys[i]].cartas != ""){
+        if(players[playerKeys[i]].cartas){
             handouts = _.assign(players[playerKeys[i]].cartas,cardsDistributed[i]);
         }else{
             handouts = cardsDistributed[i];
         }
+        //_.assign(players[playerKeys[i]],{ cartas : handouts})
         players[playerKeys[i]].cartas = handouts;
     }
 
