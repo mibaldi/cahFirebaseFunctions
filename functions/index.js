@@ -4,6 +4,7 @@ const admin = require('firebase-admin');
 admin.initializeApp(functions.config().firebase);
 const database = admin.database();
 const _ = require('lodash');
+var Stopwatch = require('timer-stopwatch');
 
 exports.createGame = functions.database.ref('/juegos/{idJuego}').onCreate(event => {
     
@@ -81,11 +82,21 @@ exports.changeTurnStatus = functions.database.ref('/juegos/{idJuego}/turnos/{idT
 
         const game = snapshot.val()
 
-        setTimeout(() => {
-            checkTimeout(status,turnRef,gameRef)
-        }, game.config.tiempo*1000);
+        var timer = new Stopwatch(game.config.tiempo*1000);
+        timer.start()
+
+        console.log("creacion timer",game.config.tiempo,timer)
+
+        checkTimeout(timer,status,turnRef,gameRef,game)
+        
+        // Fires when the timer is done
+        timer.onDone(function(){
+            console.log('Timer is complete');
+            timerComplete(timer,status,turnRef,gameRef,game)
+        });
     });
 });
+
 
 function getRandomArray(maxSize,minSize){
     let randomList = [];
@@ -136,62 +147,130 @@ function getPlayerIndex(orderDict,player){
     return _.findKey(orderDict, (value) => { return value === player});
 }
 
-function checkTimeout(status,turnRef,gameRef){
+function checkTimeout(timer,status,turnRef,gameRef,game){
 
     switch(status){
 
         case 0: 
-        checkQuestion(turnRef)
+        checkQuestion(timer,turnRef)
         break;
 
         case 1:
-        checkAnswers(turnRef)
+        checkAnswers(timer,turnRef,game)
         break;
 
         case 2:
-        checkWinner(turnRef)
+        checkWinner(timer,turnRef)
         break;
 
         case 3:
-        createTurn(gameRef)
+        createTurn(timer,gameRef)
         break;
     }
 
 }
 
-function checkQuestion(turnRef){
-	return turnRef.child('pregunta').once("value", (snapshot) => {
+function timerComplete(timer,status,turnRef,gameRef,game){
+
+    switch(status){
+
+        case 0: 
+        checkQuestionTimeout(timer,turnRef)
+        break;
+
+        case 1:
+        checkAnswersTimeout(timer,turnRef,game)
+        break;
+
+        case 2:
+        checkWinnerTimeout(timer,turnRef)
+        break;
+
+        case 3:
+        createTurn(timer,gameRef)
+        break;
+    }
+
+}
+function checkQuestion(timer,turnRef){
+	return turnRef.child('pregunta').on("value", (snapshot) => {
         let question = snapshot.val();
+        if(question){
+            timer.stop()
+            turnRef.child('estado').set(1)
+        } 
+    });
+}
+
+function checkAnswers(timer,turnRef,game){
+	return turnRef.child('posibles').on("value", (snapshot) => {
+        let possibles = snapshot.val();
+        if (possibles){
+            console.log('posibles=',possibles)
+            let numberChilds = Object.keys(possibles).length
+            if (numberChilds == game.config.numJugadores - 1) {
+                timer.stop()
+                let status = 2
+                turnRef.child('estado').set(status)
+            }
+        }
+    });
+}
+
+function checkWinner(timer,turnRef){
+
+    return turnRef.child('ganador').on("value", (snapshot) => {
+        let winner = snapshot.val();
+        if (winner){
+            timer.stop()
+            turnRef.update({ganador : winner,estado : 3})
+        }
+        
+    });
+}
+
+//TIMEOUT
+function checkQuestionTimeout(timer,turnRef){
+    return turnRef.child('pregunta').once("value", (snapshot) => {
+        let question = snapshot.val();
+        console.log("checkQuestionTimeout",question)
         if(question == null){
+            console.log("checkQuestionTimeout == null")
+
+            timer.stop()
             turnRef.child('estado').set(3)
         } 
     });
 }
 
-function checkAnswers(turnRef){
-	return turnRef.child('posibles').once("value", (snapshot) => {
+function checkAnswersTimeout(timer,turnRef,game){
+    return turnRef.child('posibles').once("value", (snapshot) => {
         let possibles = snapshot.val();
-        const status = (possibles != null)? 2 : 3;
-        turnRef.child('estado').set(status)
+        if (possibles == null){
+            timer.stop()
+            turnRef.child('estado').set(3)
+        }else {
+            timer.stop()
+            turnRef.child('estado').set(2)
+        }
     });
 }
 
-function checkWinner(turnRef){
+function checkWinnerTimeout(timer,turnRef){
 
     return turnRef.once("value", (snapshot) => {
-
         const turn = snapshot.val()
-
         let winner = turn.ganador;
         const possibles = turn.posibles;
 
         if(winner == null && possibles != null){
-        	const players = Object.keys(possibles);
-        	winner = players[ players.length * Math.random() << 0];
+            const players = Object.keys(possibles);
+            winner = players[ players.length * Math.random() << 0];
         }
         turnRef.update({ganador : winner,estado : 3})
-    });
+    })
 }
+
 
 function handOut(game,numCards){
 
@@ -222,7 +301,7 @@ function handOut(game,numCards){
     return [players,_.omit(whiteCards,index)];
 }
 
-function createTurn(gameRef){
+function createTurn(timer,gameRef){
     return gameRef.once("value", (snapshot) => {
         const game = snapshot.val()
         const numCards = _.keys(game.cartas.negras).length;
