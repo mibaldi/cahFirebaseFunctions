@@ -82,18 +82,20 @@ exports.changeTurnStatus = functions.database.ref('/juegos/{idJuego}/turnos/{idT
 
         const game = snapshot.val()
 
-        var timer = new Stopwatch(game.config.tiempo*1000);
-        timer.start()
+        if(game.config && game.config.tiempo){
+            var timer = new Stopwatch(game.config.tiempo*1000);
+            timer.start()
 
-        console.log("creacion timer",game.config.tiempo,timer)
+            console.log("creacion timer",game.config.tiempo,timer)
 
-        checkTimeout(timer,status,turnRef,gameRef,game)
-        
-        // Fires when the timer is done
-        timer.onDone(function(){
-            console.log('Timer is complete');
-            timerComplete(timer,status,turnRef,gameRef,game)
-        });
+            checkTimeout(timer,status,turnRef,gameRef,game)
+            
+            // Fires when the timer is done
+            timer.onDone(function(){
+                console.log('Timer is complete');
+                timerComplete(timer,status,turnRef,gameRef,game)
+            });
+        }
     });
 });
 
@@ -124,10 +126,13 @@ function initGame(gameRef){
         const firstTurn = {0 : {narrador : playersOrder[0]}}
 
         let obj = {}
-        obj['orden'] = playersOrder;
-        obj['turnos'] = firstTurn;
-        obj['jugadores'] = result[0];
-        obj['cartas'] = { blancas : result[1]};
+        obj.orden = playersOrder;
+        obj.turnos = firstTurn;
+        obj.jugadores = result[0];
+
+        if(obj.cartas){
+            obj.cartas.blancas = result[1];
+        }
 
         gameRef.update(obj)
 
@@ -152,7 +157,7 @@ function checkTimeout(timer,status,turnRef,gameRef,game){
     switch(status){
 
         case 0: 
-        checkQuestion(timer,turnRef)
+        checkQuestion(timer,turnRef, game, gameRef)
         break;
 
         case 1:
@@ -192,12 +197,29 @@ function timerComplete(timer,status,turnRef,gameRef,game){
     }
 
 }
-function checkQuestion(timer,turnRef){
+function checkQuestion(timer,turnRef, game, gameRef){
 	return turnRef.child('pregunta').on("value", (snapshot) => {
         let question = snapshot.val();
         if(question){
             timer.stop()
-            turnRef.child('estado').set(1)
+            let blackCards = updateBlackCards(game,question)
+            //TODO, ver si esta actualizacion se puede hacer a la vez
+            
+            /*gameRef.child('cartas').child('negras').set(blackCards)
+            turnRef.child('estado').set(1)*/
+
+            let turnKey = turnRef.key
+
+            let obj = {}
+            if(obj.cartas && obj.cartas.negras){
+                console.log("Primera comprobacion:",blackCards)
+                obj.cartas.negras = blackCards
+            }
+            if(obj.turnos && obj.turnos[turnRef]){
+                console.log("Segunda comprobacion",obj.turnos[turnRef])
+                obj.turnos[turnRef].estado = 1
+            }
+            gameRef.update(obj)
         } 
     });
 }
@@ -210,7 +232,9 @@ function checkAnswers(timer,turnRef,game){
             let numberChilds = Object.keys(possibles).length
             if (numberChilds == game.config.numJugadores - 1) {
                 timer.stop()
+                let whiteCards = updateWhiteCards(game,posibles)
                 let status = 2
+                gameRef.child('cartas').child
                 turnRef.child('estado').set(status)
             }
         }
@@ -323,6 +347,16 @@ function createTurn(timer,gameRef){
         }
 
     });
+}
+
+function updateBlackCards(game,question){
+    return  _.omitBy(game, function(value, key) {
+        return value === question
+    });
+}
+
+function updateWhiteCards(game,cards){
+    return  _.omit(game.cartas.blancas, cards);
 }
 
 
