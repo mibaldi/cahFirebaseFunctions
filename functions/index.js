@@ -24,9 +24,11 @@ exports.createGame = functions.database.ref('/juegos/{idJuego}').onCreate(event 
         const numWhites = numBlacks * config.numCartasJugador;
 
         const blackCards = getRandomArray(numBlackCards,numBlacks)
+
         const whiteCards = getRandomArray(numWhiteCards,numWhites)
 
         const cards = { negras : blackCards, blancas : whiteCards  }
+
 
         let obj = {}
         obj['cartas'] = cards;
@@ -77,26 +79,28 @@ exports.changeTurnStatus = functions.database.ref('/juegos/{idJuego}/turnos/{idT
     const turnRef = event.data.ref.parent;
     const gameRef = turnRef.parent.parent;
     const status = event.data.val()
+    if (gameRef){
+            return gameRef.once("value", (snapshot) => {
 
-    return gameRef.once("value", (snapshot) => {
+            const game = snapshot.val()
+            console.log("game",game)
+            if(game && game.config && game.config.tiempo){
+                var timer = new Stopwatch(game.config.tiempo*1000);
+                timer.start()
 
-        const game = snapshot.val()
+                console.log("creacion timer",game.config.tiempo,timer)
 
-        if(game.config && game.config.tiempo){
-            var timer = new Stopwatch(game.config.tiempo*1000);
-            timer.start()
-
-            console.log("creacion timer",game.config.tiempo,timer)
-
-            checkTimeout(timer,status,turnRef,gameRef,game)
-            
-            // Fires when the timer is done
-            timer.onDone(function(){
-                console.log('Timer is complete');
-                timerComplete(timer,status,turnRef,gameRef,game)
-            });
-        }
-    });
+                checkTimeout(timer,status,turnRef,gameRef,game)
+                
+                // Fires when the timer is done
+                timer.onDone(function(){
+                    console.log('Timer is complete');
+                    timerComplete(timer,status,turnRef,gameRef,game)
+                });
+            }
+        });
+    }
+    
 });
 
 
@@ -105,8 +109,9 @@ function getRandomArray(maxSize,minSize){
 
     while(randomList.length < minSize){
         const random = _.random(maxSize)
-        if(!randomList.includes(random)){
-            randomList.push(random)
+        let obj = {cartaId : random, usada: false}
+        if(!_.includes(randomList, obj);){
+            randomList.push(obj)
         }
     }
     return randomList;
@@ -202,23 +207,23 @@ function checkQuestion(timer,turnRef, game, gameRef){
         let question = snapshot.val();
         if(question){
             timer.stop()
+            console.log("checkQuestion:")
             let blackCards = updateBlackCards(game,question)
             //TODO, ver si esta actualizacion se puede hacer a la vez
             
             /*gameRef.child('cartas').child('negras').set(blackCards)
             turnRef.child('estado').set(1)*/
-
+            console.log("checkQuestion2:",turnRef)
             let turnKey = turnRef.key
-
             let obj = {}
-            if(obj.cartas && obj.cartas.negras){
-                console.log("Primera comprobacion:",blackCards)
-                obj.cartas.negras = blackCards
-            }
-            if(obj.turnos && obj.turnos[turnRef]){
-                console.log("Segunda comprobacion",obj.turnos[turnRef])
-                obj.turnos[turnRef].estado = 1
-            }
+            //obj.cartas = game.cartas
+            //obj.turnos = game.turnos
+            console.log("checkQuestion3:")
+            console.log("Primera comprobacion:",blackCards)
+            obj["cartas/negras"] = blackCards
+            console.log("Segunda comprobacion",turnKey)
+            obj["turnos/"+turnKey+"/estado"]= 1
+            //obj.turnos[turnKey].pregunta = question
             gameRef.update(obj)
         } 
     });
@@ -350,7 +355,10 @@ function createTurn(timer,gameRef){
 }
 
 function updateBlackCards(game,question){
-    return  _.omitBy(game, function(value, key) {
+    console.log("updateBlackCards:")
+    //TODO usar find para buscar la carta negra y modificar el usada a true
+    
+    return  _.omitBy(game.cartas.negras, function(value, key) {
         return value === question
     });
 }
