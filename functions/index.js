@@ -1,5 +1,3 @@
-
-
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
@@ -10,7 +8,7 @@ var utilsModule = require('./utils.js');
 var gameModule = require('./game.js');
 
 var turnsModule = require('./turns.js');
-
+var ref = require('./references.js')
 
 exports.createGame = functions.database.ref('/juegos/{idJuego}').onCreate(event => {
     
@@ -18,7 +16,9 @@ exports.createGame = functions.database.ref('/juegos/{idJuego}').onCreate(event 
         return;
     }
 
-    return database.ref('/cartas').once('value', (snapshot) => {
+    const gameId = event.params.idJuego;
+
+    return ref.cardsRef().once('value', (snapshot) => {
         const numWhiteCards = snapshot.child('blancas').numChildren()
         const numBlackCards = snapshot.child('negras').numChildren()
 
@@ -39,7 +39,7 @@ exports.createGame = functions.database.ref('/juegos/{idJuego}').onCreate(event 
         let obj = {}
         obj['cartas'] = cards;
         obj['estado'] = 1; 
-        event.data.ref.update(obj)
+        ref.gameRef(gameId).update(obj)
     });
 });
 
@@ -52,13 +52,13 @@ exports.changeNumPlayers = functions.database.ref('/juegos/{idJuego}/jugadores')
   const gameId = event.params.idJuego;
   let numPlayersAdded = event.data.numChildren()
 
-return database.ref('/juegos/'+gameId).once("value", (snapshot) => {
+return ref.gameRef(gameId).once("value", (snapshot) => {
     const game = snapshot.val()
     let status = 2;
     if (numPlayersAdded === game.config.numJugadores ) {
         status = 3;
         }
-        database.ref('/juegos/'+gameId+'/estado').set(status);
+        ref.gameStatusRef(gameId).set(status);
 });
 });
 
@@ -77,7 +77,7 @@ exports.changeTurnStatus = functions.database.ref('/juegos/{idJuego}/turnos/{idT
     const gameId = event.params.idJuego;
     const turnId = event.params.idTurno;
 
-        return database.ref('/juegos/'+gameId).once('value', (snapshot) => {
+        return ref.gameRef(gameId).once('value', (snapshot) => {
 
             const game = snapshot.val()
             if(game.config.tiempo){

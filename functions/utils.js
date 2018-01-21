@@ -14,11 +14,6 @@ exports.getRandomArray = function(maxSize,minSize){
     return randomList;
 }
 
-exports.finishGame = function(gameId){
-    database.ref('/juegos/'+gameId+'/estado').set(4)
-}
-
-
 exports.getPlayersOrder = function(playersDict){
     return _.shuffle(_.keys(playersDict)) 
 }

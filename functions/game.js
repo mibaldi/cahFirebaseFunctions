@@ -5,11 +5,11 @@ const database = admin.database();
 
 var modulo = require('./utils.js');
 const _ = require('lodash');
-
+var ref = require('./references.js')
 
 exports.initGame = function(gameId){
 
-    database.ref('/juegos/'+gameId).once('value', (snapshot) => {
+    return ref.gameRef(gameId).once('value', (snapshot) => {
 
         const game = snapshot.val()
 
@@ -24,7 +24,11 @@ exports.initGame = function(gameId){
         obj.jugadores = result[0];
         obj["cartas/blancas"] = _.values(result[1]);
 
-        database.ref('/juegos/'+gameId).update(obj)
+        ref.gameRef(gameId).update(obj)
 
     });
+}
+
+exports.finishGame = function(gameId){
+    ref.gameStatusRef(gameId).set(4)
 }
