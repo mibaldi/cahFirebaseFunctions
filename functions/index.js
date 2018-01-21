@@ -98,7 +98,7 @@ exports.changeTurnStatus = functions.database.ref('/juegos/{idJuego}/turnos/{idT
 });
 
 
-function getRandomArray(maxSize,minSize){
+getRandomArray = function(maxSize,minSize){
     let randomList = [];
 
     while(randomList.length < minSize){
@@ -110,7 +110,7 @@ function getRandomArray(maxSize,minSize){
     return randomList;
 }
 
-function initGame(gameId){
+initGame = function(gameId){
 
     database.ref('/juegos/'+gameId).once('value', (snapshot) => {
 
@@ -134,20 +134,20 @@ function initGame(gameId){
     });
 }
 
-function finishGame(gameId){
+finishGame = function(gameId){
     database.ref('/juegos/'+gameId+'/estado').set(4)
 }
 
 
-function getPlayersOrder(playersDict){
+getPlayersOrder = function(playersDict){
     return _.shuffle(_.keys(playersDict)) 
 }
 
-function getPlayerIndex(orderDict,player){
+getPlayerIndex = function(orderDict,player){
     return _.findKey(orderDict, (value) => { return value === player});
 }
 
-function checkTimeout(timer,status,turnId,gameId,game){
+checkTimeout = function(timer,status,turnId,gameId,game){
 
     switch(status){
 
@@ -170,7 +170,7 @@ function checkTimeout(timer,status,turnId,gameId,game){
 
 }
 
-function timerComplete(timer,status,turnId,gameId,game){
+timerComplete = function(timer,status,turnId,gameId,game){
 
     switch(status){
 
@@ -192,7 +192,7 @@ function timerComplete(timer,status,turnId,gameId,game){
     }
 
 }
-function checkQuestion(timer,turnId, game, gameId){
+checkQuestion = function(timer,turnId, game, gameId){
     return database.ref('/juegos/'+gameId+'/turnos/'+turnId+'/pregunta').on('value', (snapshot) => {
         let question = snapshot.val();
         if(question != null){
@@ -211,7 +211,7 @@ function checkQuestion(timer,turnId, game, gameId){
     });
 }
 
-function checkAnswers(timer,turnId,game, gameId){
+checkAnswers = function(timer,turnId,game, gameId){
     return database.ref('/juegos/'+gameId+'/turnos/'+turnId+'/posibles').on('value', (snapshot) => {
         let possibles = snapshot.val();
         if (possibles){
@@ -234,7 +234,7 @@ function checkAnswers(timer,turnId,game, gameId){
     });
 }
 
-function checkWinner(timer,turnId,gameId){
+checkWinner = function(timer,turnId,gameId){
     return database.ref('/juegos/'+gameId+'/turnos/'+turnId+'/ganador').on('value', (snapshot) => {
         let winner = snapshot.val();
         console.log("WINNER",winner)
@@ -246,7 +246,7 @@ function checkWinner(timer,turnId,gameId){
 }
 
 //TIMEOUT
-function checkQuestionTimeout(timer,turnId,gameId){
+checkQuestionTimeout = function(timer,turnId,gameId){
     return database.ref('/juegos/'+gameId+'/turnos/'+turnId+'/pregunta').once('value', (snapshot) => {
         let question = snapshot.val();
         console.log("checkQuestionTimeout",question)
@@ -259,7 +259,7 @@ function checkQuestionTimeout(timer,turnId,gameId){
     });
 }
 
-function checkAnswersTimeout(timer,turnId,game, gameId){
+checkAnswersTimeout = function(timer,turnId,game, gameId){
     return database.ref('/juegos/'+gameId+'/turnos/'+turnId+'/posibles').once('value', (snapshot) => {
         let possibles = snapshot.val();
         let status = 2;
@@ -271,7 +271,7 @@ function checkAnswersTimeout(timer,turnId,game, gameId){
     });
 }
 
-function checkWinnerTimeout(timer,turnId,gameId){
+checkWinnerTimeout = function(timer,turnId,gameId){
     return database.ref('/juegos/'+gameId+'/turnos/'+turnId).once("value", (snapshot) => {
         const turn = snapshot.val()
         let winner = turn.ganador;
@@ -286,7 +286,7 @@ function checkWinnerTimeout(timer,turnId,gameId){
 }
 
 
-function handOut(game,numCards){
+handOut = function(game,numCards){
 
     const numPlayers = game.config.numJugadores;
     const numCardsToDistribute = numPlayers * numCards;
@@ -316,7 +316,7 @@ function handOut(game,numCards){
     return [players,_.omit(whiteCards,index)];
 }
 
-function createTurn(timer,turnId,game,gameId){
+createTurn = function(timer,turnId,game,gameId){
     timer.stop()
     
     const turns = game.turnos;
@@ -354,7 +354,7 @@ function createTurn(timer,turnId,game,gameId){
     }
 }
 
-function updateBlackCards(game,question){
+updateBlackCards = function(game,question){
     console.log("updateBlackCards:")
     
     let blackCards = _.omitBy(game.cartas.negras, function(value, key) {
@@ -364,7 +364,7 @@ function updateBlackCards(game,question){
     return  _.values(blackCards);
 }
 
-function updateWhiteCards(game,cards){
+updateWhiteCards = function(game,cards){
     console.log("UPDATEWHITECARDS")
     let cardsValue = _.values(cards).filter(String)
     console.log("VALORES BLANCAS:"+cardsValue)
@@ -374,7 +374,7 @@ function updateWhiteCards(game,cards){
     return _.values(whiteCards)
 }
 
-function updatePlayerCards(players,cards){
+updatePlayerCards = function(players,cards){
     let playersUpdated = players;
 
     for(let key of _.keys(cards)){
