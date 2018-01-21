@@ -127,10 +127,7 @@ function initGame(gameId){
         obj.orden = playersOrder;
         obj.turnos = firstTurn;
         obj.jugadores = result[0];
-
-        if(obj.cartas){
-            obj.cartas.blancas = result[1];
-        }
+        obj["cartas/blancas"] = _.values(result[1]);
 
         database.ref('/juegos/'+gameId).update(obj)
 
@@ -224,11 +221,8 @@ function checkAnswers(timer,turnId,game, gameId){
             if (numberChilds === parseInt(game.config.numJugadores)) {
                 console.log("ENTRA AQUI")
                 timer.stop()
-                let whiteCards = updateWhiteCards(game,possibles)
                 let players = updatePlayerCards(game.jugadores,possibles)
                 let obj = {}
-                console.log("UPDATEWHITECARDS",whiteCards)
-                obj["cartas/blancas"] = whiteCards
                 obj["turnos/"+turnId+"/estado"]= 2
                 obj["jugadores"] = players
                 database.ref('/juegos/'+gameId).update(obj)
@@ -243,6 +237,7 @@ function checkAnswers(timer,turnId,game, gameId){
 function checkWinner(timer,turnId,gameId){
     return database.ref('/juegos/'+gameId+'/turnos/'+turnId+'/ganador').on('value', (snapshot) => {
         let winner = snapshot.val();
+        console.log("WINNER",winner)
         if (winner){
             timer.stop()
             database.ref('/juegos/'+gameId+'/turnos/'+turnId+'/estado').set(3)
@@ -323,15 +318,14 @@ function handOut(game,numCards){
 
 function createTurn(timer,turnId,game,gameId){
     timer.stop()
-    const numCards = _.keys(game.cartas.negras).length;
-
+    
     const turns = game.turnos;
     const order = game.orden;
     const lastTurn = turns[_.keys(turns)[turnId]];
     console.log("LAST TURN", lastTurn)
     const lastIndexOrder = getPlayerIndex(order,lastTurn.narrador)
 
-    if(numCards === 0){
+    if(!game.cartas){
         finishGame(gameId)
     }else{
         let newIndexOrder;
@@ -349,7 +343,7 @@ function createTurn(timer,turnId,game,gameId){
             const result = handOut(gameAux,1)
             let obj = {}
 
-            obj["cartas/blancas"] = result[1];
+            obj["cartas/blancas"] = _.values(result[1]);
             obj["turnos/"+newIndexTurn]= newTurn
             obj["jugadores"] = result[0]
 
