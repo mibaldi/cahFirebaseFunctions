@@ -304,7 +304,7 @@ function handOut(game,numCards){
     for (i = 0; i < playerKeys.length; i++) { 
         let handouts;
         if(players[playerKeys[i]].cartas){
-            handouts = _.assign(players[playerKeys[i]].cartas,cardsDistributed[i]);
+            handouts = _.concat(players[playerKeys[i]].cartas,cardsDistributed[i])
         }else{
             handouts = cardsDistributed[i];
         }
