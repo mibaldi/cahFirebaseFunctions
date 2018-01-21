@@ -7,20 +7,20 @@ var modulo = require('./utils.js');
 const _ = require('lodash');
 
 
-exports.checkTimeout = function(timer,status,turnId,gameId,game){
+exports.checkTimeout = function(timer,status,turnId,gameId,game,isTimeout){
 
     switch(status){
 
         case 0: 
-        checkQuestion(timer,turnId, game, gameId)
+        checkQuestion(timer,turnId, game, gameId, isTimeout)
         break;
 
         case 1:
-        checkAnswers(timer,turnId,game,gameId)
+        checkAnswers(timer,turnId,game,gameId, isTimeout)
         break;
 
         case 2:
-        checkWinner(timer,turnId)
+        checkWinner(timer,turnId, isTimeout)
         break;
 
         case 3:
@@ -30,27 +30,90 @@ exports.checkTimeout = function(timer,status,turnId,gameId,game){
 
 }
 
-exports.timerComplete = function(timer,status,turnId,gameId,game){
+checkQuestion = function(timer,turnId, game, gameId, isTimeout){
 
-    switch(status){
+    let ref = database.ref('/juegos/'+gameId+'/turnos/'+turnId+'/pregunta')
 
-        case 0: 
-        checkQuestionTimeout(timer,turnId,gameId)
-        break;
-
-        case 1:
-        checkAnswersTimeout(timer,turnId,game,gameId)
-        break;
-
-        case 2:
-        checkWinnerTimeout(timer,turnId, gameId)
-        break;
-
-        case 3:
-        createTurn(timer,turnRef,gameRef)
-        break;
+    if(isTimeout){
+        return ref.once('value', (snapshot) => {
+            let question = snapshot.val();
+            if(question == null){
+                timer.stop()
+                database.ref('/juegos/'+gameId+'/turnos/'+turnId+'/estado').set(3)
+            } 
+        });
+    }else{
+        return ref.on('value', (snapshot) => {
+            let question = snapshot.val();
+            if(question != null){
+                timer.stop()
+                let blackCards = modulo.updateBlackCards(game,question)
+                let obj = {}
+                obj["cartas/negras"] = blackCards
+                obj["turnos/"+turnId+"/estado"]= 1
+                database.ref('/juegos/'+gameId).update(obj)
+            } 
+        });
     }
+}
 
+checkAnswers = function(timer,turnId,game, gameId, isTimeout){
+
+    let ref = database.ref('/juegos/'+gameId+'/turnos/'+turnId+'/posibles')
+
+    if(isTimeout){
+        return ref.once('value', (snapshot) => {
+            let possibles = snapshot.val();
+            let status = 2;
+            timer.stop()
+            if (possibles == null){
+                status = 3
+            }
+            database.ref('/juegos/'+gameId+'/turnos/'+turnId+'/estado').set(status)
+        });
+    }else{
+        return ref.on('value', (snapshot) => {
+            let possibles = snapshot.val();
+            if (possibles){
+                let numberChilds = Object.keys(possibles).length
+                if (numberChilds === parseInt(game.config.numJugadores)) {
+                    timer.stop()
+                    let players = modulo.updatePlayerCards(game.jugadores,possibles)
+                    let obj = {}
+                    obj["turnos/"+turnId+"/estado"]= 2
+                    obj["jugadores"] = players
+                    database.ref('/juegos/'+gameId).update(obj)
+                }
+            }
+        });
+    }
+}
+
+checkWinner = function(timer,turnId,gameId, isTimeout){
+
+    let ref = database.ref('/juegos/'+gameId+'/turnos/'+turnId+'/ganador')
+
+    if(isTimeout){
+        return database.ref('/juegos/'+gameId+'/turnos/'+turnId).once("value", (snapshot) => {
+            const turn = snapshot.val()
+            let winner = turn.ganador;
+            const possibles = turn.posibles;
+    
+            if(winner == null && possibles != null){
+                const players = Object.keys(possibles);
+                winner = players[ players.length * Math.random() << 0];
+            }
+            database.ref('/juegos/'+gameId+'/turnos/'+turnId).update({ganador : winner,estado : 3})
+        })
+    }else{
+        return ref.on('value', (snapshot) => {
+            let winner = snapshot.val();
+            if (winner){
+                timer.stop()
+                database.ref('/juegos/'+gameId+'/turnos/'+turnId+'/estado').set(3)
+            }
+        });
+    }
 }
 
 createTurn = function(timer,turnId,game,gameId){
@@ -59,7 +122,6 @@ createTurn = function(timer,turnId,game,gameId){
     const turns = game.turnos;
     const order = game.orden;
     const lastTurn = turns[_.keys(turns)[turnId]];
-    console.log("LAST TURN", lastTurn)
     const lastIndexOrder = modulo.getPlayerIndex(order,lastTurn.narrador)
 
     if(!game.cartas){
@@ -87,97 +149,4 @@ createTurn = function(timer,turnId,game,gameId){
             database.ref('/juegos/'+gameId).update(obj)
         }); 
     }
-}
-
-checkQuestion = function(timer,turnId, game, gameId){
-    return database.ref('/juegos/'+gameId+'/turnos/'+turnId+'/pregunta').on('value', (snapshot) => {
-        let question = snapshot.val();
-        if(question != null){
-            timer.stop()
-            console.log("checkQuestion:")
-            let blackCards = modulo.updateBlackCards(game,question)
-            console.log("checkQuestion2:",turnId)
-            let obj = {}
-            console.log("checkQuestion3:")
-            console.log("Primera comprobacion:",blackCards)
-            obj["cartas/negras"] = blackCards
-            console.log("Segunda comprobacion",turnId)
-            obj["turnos/"+turnId+"/estado"]= 1
-            database.ref('/juegos/'+gameId).update(obj)
-        } 
-    });
-}
-
-checkAnswers = function(timer,turnId,game, gameId){
-    return database.ref('/juegos/'+gameId+'/turnos/'+turnId+'/posibles').on('value', (snapshot) => {
-        let possibles = snapshot.val();
-        if (possibles){
-            console.log('posibles=',possibles)
-            let numberChilds = Object.keys(possibles).length
-            console.log("NUM HIJOS",numberChilds)
-            if (numberChilds === parseInt(game.config.numJugadores)) {
-                console.log("ENTRA AQUI")
-                timer.stop()
-                let players = modulo.updatePlayerCards(game.jugadores,possibles)
-                let obj = {}
-                obj["turnos/"+turnId+"/estado"]= 2
-                obj["jugadores"] = players
-                database.ref('/juegos/'+gameId).update(obj)
-            }else{
-                console.log("NO ENTRA",numberChilds)
-                console.log("NO ENTRA",game.config.numJugadores)
-            }
-        }
-    });
-}
-
-checkWinner = function(timer,turnId,gameId){
-    return database.ref('/juegos/'+gameId+'/turnos/'+turnId+'/ganador').on('value', (snapshot) => {
-        let winner = snapshot.val();
-        console.log("WINNER",winner)
-        if (winner){
-            timer.stop()
-            database.ref('/juegos/'+gameId+'/turnos/'+turnId+'/estado').set(3)
-        }
-    });
-}
-
-//TIMEOUT
-checkQuestionTimeout = function(timer,turnId,gameId){
-    return database.ref('/juegos/'+gameId+'/turnos/'+turnId+'/pregunta').once('value', (snapshot) => {
-        let question = snapshot.val();
-        console.log("checkQuestionTimeout",question)
-        if(question == null){
-            console.log("checkQuestionTimeout == null")
-
-            timer.stop()
-            database.ref('/juegos/'+gameId+'/turnos/'+turnId+'/estado').set(3)
-        } 
-    });
-}
-
-checkAnswersTimeout = function(timer,turnId,game, gameId){
-    return database.ref('/juegos/'+gameId+'/turnos/'+turnId+'/posibles').once('value', (snapshot) => {
-        let possibles = snapshot.val();
-        let status = 2;
-        timer.stop()
-        if (possibles == null){
-            status = 3
-        }
-        database.ref('/juegos/'+gameId+'/turnos/'+turnId+'/estado').set(status)
-    });
-}
-
-checkWinnerTimeout = function(timer,turnId,gameId){
-    return database.ref('/juegos/'+gameId+'/turnos/'+turnId).once("value", (snapshot) => {
-        const turn = snapshot.val()
-        let winner = turn.ganador;
-        const possibles = turn.posibles;
-
-        if(winner == null && possibles != null){
-            const players = Object.keys(possibles);
-            winner = players[ players.length * Math.random() << 0];
-        }
-        database.ref('/juegos/'+gameId+'/turnos/'+turnId).update({ganador : winner,estado : 3})
-    })
 }

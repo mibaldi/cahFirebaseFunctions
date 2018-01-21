@@ -1,3 +1,5 @@
+
+
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
@@ -6,6 +8,7 @@ const database = admin.database();
 var Stopwatch = require('timer-stopwatch');
 var utilsModule = require('./utils.js');
 var gameModule = require('./game.js');
+
 var turnsModule = require('./turns.js');
 
 
@@ -36,7 +39,6 @@ exports.createGame = functions.database.ref('/juegos/{idJuego}').onCreate(event 
         let obj = {}
         obj['cartas'] = cards;
         obj['estado'] = 1; 
-        console.log("Cartas generadas");
         event.data.ref.update(obj)
     });
 });
@@ -49,16 +51,12 @@ exports.changeNumPlayers = functions.database.ref('/juegos/{idJuego}/jugadores')
     
   const gameId = event.params.idJuego;
   let numPlayersAdded = event.data.numChildren()
-  console.log("NUM JUGADORES:"+numPlayersAdded)
 
 return database.ref('/juegos/'+gameId).once("value", (snapshot) => {
     const game = snapshot.val()
     let status = 2;
     if (numPlayersAdded === game.config.numJugadores ) {
         status = 3;
-        console.log("Empieza la partida");
-        }else {
-        console.log('Faltan jugadores');
         }
         database.ref('/juegos/'+gameId+'/estado').set(status);
 });
@@ -82,19 +80,15 @@ exports.changeTurnStatus = functions.database.ref('/juegos/{idJuego}/turnos/{idT
         return database.ref('/juegos/'+gameId).once('value', (snapshot) => {
 
             const game = snapshot.val()
-            console.log("game",game)
             if(game.config.tiempo){
                 var timer = new Stopwatch(game.config.tiempo*1000);
                 timer.start()
 
-                console.log("creacion timer",game.config.tiempo,timer)
-
-                turnsModule.checkTimeout(timer,status,turnId,gameId,game)
+                turnsModule.checkTimeout(timer,status,turnId,gameId,game,false)
 
                 // Fires when the timer is done
                 timer.onDone(function(){
-                    console.log('Timer is complete');
-                    turnsModule.timerComplete(timer,status,turnId,gameId,game)
+                    turnsModule.checkTimeout(timer,status,turnId,gameId,game,true)
                 });
             } 
         });

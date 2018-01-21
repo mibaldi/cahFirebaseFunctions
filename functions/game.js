@@ -15,8 +15,6 @@ exports.initGame = function(gameId){
 
         const result =  modulo.handOut(game,game.config.numCartasJugador)
 
-        console.log(result)
-
         const playersOrder = modulo.getPlayersOrder(result[0])
         const firstTurn = {0 : {narrador : playersOrder[0]}}
 

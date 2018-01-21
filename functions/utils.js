@@ -39,8 +39,6 @@ exports.handOut = function(game,numCards){
 
     const cardsDistributed = _.chunk(cards.slice(0,numCardsToDistribute),numCards)
 
-    console.log("Cartas:",cardsDistributed)
-
     const playerKeys =  _.keys(players);
     for (i = 0; i < playerKeys.length; i++) { 
         let handouts;
@@ -60,8 +58,6 @@ exports.handOut = function(game,numCards){
 
 
 exports.updateBlackCards = function(game,question){
-    console.log("updateBlackCards:")
-    
     let blackCards = _.omitBy(game.cartas.negras, function(value, key) {
         return value === question
     })
@@ -78,6 +74,5 @@ exports.updatePlayerCards = function(players,cards){
         });
         playersUpdated[key].cartas = _.values(playerCards)
     }
-    console.log("CARTAS ACTUALIZADAS:"+playersUpdated)
     return playersUpdated
 }
