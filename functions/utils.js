@@ -25,7 +25,7 @@ exports.getPlayerIndex = function(orderDict,player){
 exports.handOut = function(game,numCards){
 
     const numPlayers = game.config.numJugadores;
-    const numCardsToDistribute = numPlayers * numCards;
+    let numCardsToDistribute = numPlayers * numCards;
     let whiteCards = game.cartas.blancas
 
     let players = game.jugadores
@@ -36,9 +36,14 @@ exports.handOut = function(game,numCards){
 
     const playerKeys =  _.keys(players);
     for (i = 0; i < playerKeys.length; i++) { 
-        let handouts;
-        if(players[playerKeys[i]].cartas){
-            handouts = _.concat(players[playerKeys[i]].cartas,cardsDistributed[i])
+        let handouts = players[playerKeys[i]].cartas;
+        
+        if(handouts){
+            if(handouts.length < game.config.numCartasJugador){
+                handouts = _.concat(handouts,cardsDistributed[i])
+            }else{
+                numCardsToDistribute -= numCards;
+            }
         }else{
             handouts = cardsDistributed[i];
         }

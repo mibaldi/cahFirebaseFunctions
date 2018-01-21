@@ -23,7 +23,7 @@ exports.checkTimeout = function(timer,status,turnId,gameId,game,isTimeout){
         break;
 
         case 2:
-        checkWinner(timer,turnId, isTimeout)
+        checkWinner(timer,turnId,gameId, isTimeout)
         break;
 
         case 3:
@@ -69,10 +69,15 @@ checkAnswers = function(timer,turnId,game, gameId, isTimeout){
             let possibles = snapshot.val();
             let status = 2;
             timer.stop()
-            if (possibles == null){
+            let obj = {}
+            if(possibles){
+                let players = utilsModule.updatePlayerCards(game.jugadores,possibles)
+                obj["jugadores"] = players
+            }else{
                 status = 3
             }
-            ref.turnStatusRef(gameId,turnId).set(status)
+            obj["turnos/"+turnId+"/estado"]= status
+            ref.gameRef(gameId).update(obj)
         });
     }else{
         return res.on('value', (snapshot) => {
@@ -94,24 +99,36 @@ checkAnswers = function(timer,turnId,game, gameId, isTimeout){
 
 checkWinner = function(timer,turnId,gameId, isTimeout){
 
+    console.log("checkWinner timeout: ", isTimeout)
+
     if(isTimeout){
         return ref.turnRef(gameId,turnId).once("value", (snapshot) => {
+            console.log("TIMEOUT/ TURNREF: ", isTimeout)
+
             const turn = snapshot.val()
             let winner = turn.ganador;
             const possibles = turn.posibles;
+
+            console.log("GET VALUES ")
+
     
             if(winner == null && possibles != null){
-                const players = Object.keys(possibles);
+                const players = _.keys(possibles);
                 winner = players[ players.length * Math.random() << 0];
             }
             ref.turnRef(gameId,turnId).update({ganador : winner,estado : 3})
         })
     }else{
         return ref.turnWinnerRef(gameId,turnId).on('value', (snapshot) => {
+            console.log("NO TIMEOUT/ TURNWINNERREF: ", isTimeout)
             let winner = snapshot.val();
             if (winner){
+                console.log("WINNER: ")
                 timer.stop()
                 ref.turnStatusRef(gameId,turnId).set(3)
+            }else{
+                console.log("NO WINNER: ")
+
             }
         });
     }

@@ -35,7 +35,6 @@ exports.createGame = functions.database.ref('/juegos/{idJuego}').onCreate(event 
 
         const cards = { negras : blackCards, blancas : whiteCards  }
 
-
         let obj = {}
         obj['cartas'] = cards;
         obj['estado'] = 1; 
