@@ -23,7 +23,7 @@ exports.initGame = function(gameId){
         obj.turnos = firstTurn;
         obj.jugadores = result[0];
         obj["cartas/blancas"] = _.values(result[1]);
-
+        obj["estado"] = 2
         ref.gameRef(gameId).update(obj)
 
     });

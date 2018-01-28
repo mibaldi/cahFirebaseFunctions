@@ -51,21 +51,19 @@ exports.changeNumPlayers = functions.database.ref('/juegos/{idJuego}/jugadores')
   const gameId = event.params.idJuego;
   let numPlayersAdded = event.data.numChildren()
 
-return ref.gameRef(gameId).once("value", (snapshot) => {
-    const game = snapshot.val()
-    let status = 2;
-    if (numPlayersAdded === game.config.numJugadores ) {
-        status = 3;
+    return ref.gameRef(gameId).once("value", (snapshot) => {
+        const game = snapshot.val()
+        if (numPlayersAdded === game.config.numJugadores ) {
+            gameModule.initGame(gameId)
         }
-        ref.gameStatusRef(gameId).set(status);
-});
+    });
 });
 
 exports.changeGameStatus = functions.database.ref('/juegos/{idJuego}/estado').onWrite(event => {
     const status = event.data.val()
     const gameId = event.params.idJuego;
     if(status === 3){
-        gameModule.initGame(gameId)
+        ref.turnStatusRef(gameId,0).set(0)
     }
     return status;
 });
@@ -76,21 +74,20 @@ exports.changeTurnStatus = functions.database.ref('/juegos/{idJuego}/turnos/{idT
     const gameId = event.params.idJuego;
     const turnId = event.params.idTurno;
 
-        return ref.gameRef(gameId).once('value', (snapshot) => {
+    return ref.gameRef(gameId).once('value', (snapshot) => {
+        const game = snapshot.val()
+        if(game.config.tiempo){
+            var timer = new Stopwatch(game.config.tiempo*1000);
+            timer.start()
 
-            const game = snapshot.val()
-            if(game.config.tiempo){
-                var timer = new Stopwatch(game.config.tiempo*1000);
-                timer.start()
+            turnsModule.checkTimeout(timer,status,turnId,gameId,game,false)
 
-                turnsModule.checkTimeout(timer,status,turnId,gameId,game,false)
-
-                // Fires when the timer is done
-                timer.onDone(function(){
-                    turnsModule.checkTimeout(timer,status,turnId,gameId,game,true)
-                });
-            } 
-        });
+            // Fires when the timer is done
+            timer.onDone(function(){
+                turnsModule.checkTimeout(timer,status,turnId,gameId,game,true)
+            });
+        } 
+    });
 });
 
 
