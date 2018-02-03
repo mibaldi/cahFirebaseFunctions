@@ -9,6 +9,8 @@ var gameModule = require('./game.js');
 
 var turnsModule = require('./turns.js');
 var ref = require('./references.js')
+const _ = require('lodash');
+
 
 exports.createGame = functions.database.ref('/juegos/{idJuego}').onCreate(event => {
     
@@ -42,18 +44,19 @@ exports.createGame = functions.database.ref('/juegos/{idJuego}').onCreate(event 
     });
 });
 
-exports.changeNumPlayers = functions.database.ref('/juegos/{idJuego}/jugadores').onWrite(event => {
+exports.changeNumPlayers = functions.database.ref('/juegos/{idJuego}/jugadores/{idJugador}').onCreate(event => {
 	
   if (!event.data.exists()) {
     return;
   }
     
   const gameId = event.params.idJuego;
-  let numPlayersAdded = event.data.numChildren()
-
     return ref.gameRef(gameId).once("value", (snapshot) => {
         const game = snapshot.val()
-        if (numPlayersAdded === game.config.numJugadores ) {
+
+        let numPlayers = _.keys(game.jugadores).length
+        
+        if ( numPlayers === game.config.numJugadores ) {
             gameModule.initGame(gameId)
         }
     });

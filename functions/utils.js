@@ -69,10 +69,12 @@ exports.updatePlayerCards = function(players,cards){
     let playersUpdated = players;
 
     for(let key of _.keys(cards)){
-        let playerCards = _.omitBy(players[key].cartas, function(value, keyPlayer) {
-            return value === cards[key]
-        });
-        playersUpdated[key].cartas = _.values(playerCards)
+        if(players[key] && players[key].cartas){
+            let playerCards = _.omitBy(players[key].cartas, function(value, keyPlayer) {
+                return value == cards[key]
+            });
+            playersUpdated[key].cartas = _.values(playerCards)
+        }
     }
     return playersUpdated
 }

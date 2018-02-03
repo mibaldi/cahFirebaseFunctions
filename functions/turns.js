@@ -80,6 +80,7 @@ checkAnswers = function(timer,turnId,game, gameId, isTimeout){
             ref.gameRef(gameId).update(obj)
         });
     }else{
+
         return res.on('value', (snapshot) => {
             let possibles = snapshot.val();
             if (possibles){
@@ -90,6 +91,7 @@ checkAnswers = function(timer,turnId,game, gameId, isTimeout){
                     let obj = {}
                     obj["turnos/"+turnId+"/estado"]= 2
                     obj["jugadores"] = players
+
                     ref.gameRef(gameId).update(obj)
                 }
             }
@@ -99,18 +101,12 @@ checkAnswers = function(timer,turnId,game, gameId, isTimeout){
 
 checkWinner = function(timer,turnId,gameId, isTimeout){
 
-    console.log("checkWinner timeout: ", isTimeout)
-
     if(isTimeout){
         return ref.turnRef(gameId,turnId).once("value", (snapshot) => {
-            console.log("TIMEOUT/ TURNREF: ", isTimeout)
 
             const turn = snapshot.val()
             let winner = turn.ganador;
             const possibles = turn.posibles;
-
-            console.log("GET VALUES ")
-
     
             if(winner == null && possibles != null){
                 const players = _.keys(possibles);
@@ -120,15 +116,10 @@ checkWinner = function(timer,turnId,gameId, isTimeout){
         })
     }else{
         return ref.turnWinnerRef(gameId,turnId).on('value', (snapshot) => {
-            console.log("NO TIMEOUT/ TURNWINNERREF: ", isTimeout)
             let winner = snapshot.val();
             if (winner){
-                console.log("WINNER: ")
                 timer.stop()
                 ref.turnStatusRef(gameId,turnId).set(3)
-            }else{
-                console.log("NO WINNER: ")
-
             }
         });
     }
